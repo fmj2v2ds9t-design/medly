@@ -10,7 +10,22 @@ import { LabResultsScreen } from "./lab-results-screen"
 import { PharmacyScreen } from "./pharmacy-screen"
 import { ProfileScreen } from "./profile-screen"
 import { QrSheet, ConfirmationModal } from "./overlays"
-import type { Doctor } from "@/lib/medly-data"
+import { supabase } from "@/lib/supabase"
+
+type Doctor = {
+  id: string
+  name: string
+  specialty: string
+  city: string
+  photo_url: string | null
+  distance_km: number | null
+  patients_count: number | null
+  experience_years: number | null
+  rating: number | null
+  reviews_count: number | null
+  about: string | null
+  fee: number | null
+}
 
 // A "dark" status bar shows on non-header screens over the primary header on home/profile
 const darkStatusScreens: TabId[] = ["home"]
@@ -29,6 +44,26 @@ export function MedlyApp() {
     setTab(next)
   }
 
+  async function handleConfirmAppointment(doctor: Doctor, day: string, slot: string) {
+    setOpenDoctorId(null)
+    setConfirmation({ doctor, day, slot })
+
+    const today = new Date().toISOString().split("T")[0]
+
+    const { error } = await supabase.from("appointments").insert({
+      doctor_id: doctor.id,
+      patient_name: "Guest Patient",
+      patient_phone: null,
+      appointment_date: today,
+      appointment_time: slot,
+      status: "pending",
+    })
+
+        if (error) {
+      console.error("Failed to save appointment:", error)
+    }
+  }
+
   return (
     <PhoneFrame>
       {/* status bar adapts color to what's behind it */}
@@ -43,10 +78,7 @@ export function MedlyApp() {
           <DoctorProfileScreen
             doctorId={openDoctorId}
             onBack={() => setOpenDoctorId(null)}
-            onConfirm={(doctor, day, slot) => {
-              setOpenDoctorId(null)
-              setConfirmation({ doctor, day, slot })
-            }}
+            onConfirm={handleConfirmAppointment}
           />
         ) : (
           <>

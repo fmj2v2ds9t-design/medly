@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import {
   ChevronLeft,
@@ -12,8 +12,23 @@ import {
   MessageCircle,
   Check,
 } from "lucide-react"
-import { doctors, type Doctor } from "@/lib/medly-data"
+import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+
+type Doctor = {
+  id: string
+  name: string
+  specialty: string
+  city: string
+  photo_url: string | null
+  distance_km: number | null
+  patients_count: number | null
+  experience_years: number | null
+  rating: number | null
+  reviews_count: number | null
+  about: string | null
+  fee: number | null
+}
 
 const days = [
   { label: "Mon", date: "16" },
@@ -35,9 +50,36 @@ export function DoctorProfileScreen({
   onBack: () => void
   onConfirm: (doctor: Doctor, day: string, slot: string) => void
 }) {
-  const doctor = doctors.find((d) => d.id === doctorId) ?? doctors[0]
+  const [doctor, setDoctor] = useState<Doctor | null>(null)
+  const [loading, setLoading] = useState(true)
   const [activeDay, setActiveDay] = useState(0)
   const [activeSlot, setActiveSlot] = useState<string | null>("10:30")
+
+  useEffect(() => {
+    async function fetchDoctor() {
+      const { data, error } = await supabase
+        .from("doctors")
+        .select("*")
+        .eq("id", doctorId)
+        .single()
+
+      if (error) {
+        console.error("Error fetching doctor:", error)
+      } else {
+        setDoctor(data)
+      }
+      setLoading(false)
+    }
+    fetchDoctor()
+  }, [doctorId])
+
+  if (loading) {
+    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>
+  }
+
+  if (!doctor) {
+    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Doctor not found</div>
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -68,7 +110,7 @@ export function DoctorProfileScreen({
         {/* profile card */}
         <div className="flex items-center gap-4">
           <Image
-            src={doctor.image}
+            src={doctor.photo_url || "/placeholder-user.jpg"}
             alt={doctor.name}
             width={80}
             height={80}
@@ -79,22 +121,22 @@ export function DoctorProfileScreen({
             <p className="text-sm text-primary">{doctor.specialty}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3 w-3" />
-              {doctor.location} · {doctor.distanceKm} km
+              {doctor.city} · {doctor.distance_km ?? "—"} km
             </p>
           </div>
         </div>
 
         {/* stats */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <Stat icon={Users} value={doctor.patients} label="Patients" />
-          <Stat icon={Award} value={`${doctor.experienceYears} yrs`} label="Experience" />
-          <Stat icon={Star} value={`${doctor.rating}`} label={`${doctor.reviews} reviews`} />
+          <Stat icon={Users} value={`${doctor.patients_count ?? 0}`} label="Patients" />
+          <Stat icon={Award} value={`${doctor.experience_years ?? 0} yrs`} label="Experience" />
+          <Stat icon={Star} value={`${doctor.rating ?? 0}`} label={`${doctor.reviews_count ?? 0} reviews`} />
         </div>
 
         {/* about */}
         <section className="mt-6">
           <h2 className="text-sm font-bold text-foreground">About</h2>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{doctor.about}</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{doctor.about ?? "No bio available."}</p>
         </section>
 
         {/* calendar */}
@@ -151,7 +193,7 @@ export function DoctorProfileScreen({
           <div>
             <p className="text-[10px] text-muted-foreground">Consultation fee</p>
             <p className="text-lg font-bold text-foreground">
-              ${doctor.fee}
+              ${doctor.fee ?? 0}
               <span className="text-xs font-medium text-muted-foreground"> /visit</span>
             </p>
           </div>
